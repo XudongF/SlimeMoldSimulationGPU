@@ -1,4 +1,4 @@
-Agent based Simulation in GPU. 
+# Agent based Simulation in GPU. 
 
 Using GPU can effienctly increase the computing speed for agent-based simulation. 
 
