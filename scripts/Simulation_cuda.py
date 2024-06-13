@@ -1,4 +1,4 @@
-
+#!/bin/env python
 # %%
 from Agent import Slime
 from numba import cuda
@@ -10,6 +10,7 @@ import math
 import random
 from numba.cuda.random import create_xoroshiro128p_states, xoroshiro128p_uniform_float32
 import time
+
 
 
 def generate_sample(Diameter, radius):
@@ -200,10 +201,20 @@ if __name__ == "__main__":
     s = 0
     rng_states = create_xoroshiro128p_states(1024 * 1024, seed=1)
     iterations = 10000
+   
+    from timeit import default_timer as timer #added
+    start = timer() #added
     while s < iterations:
 
         set_zeros[blockspergrid, threadsperblock](occupied_device)
         update_occupied[1024, 1024](locations_device, occupied_device)
+
+	# transfer frames of the movie from gpu, which is a bottleneck
+	# some options for reducing this bottleneck that we discussed:
+	# - reduce frequency of transfer?
+	# - transfer in a thread so can be working while transferring?
+	# - accumulate frames (or inter-frame diffs) on the gpu and
+	#   transfer/reconstruct frames after the loop is done?)
         if s % 50 == 0:
             print(f"******This is {s} of {iterations}*******")
             occupied = occupied_device.copy_to_host()
@@ -215,6 +226,9 @@ if __name__ == "__main__":
         update_petridish[1024, 1024](locations_device, petridish_device)
         evaporate[blockspergrid, threadsperblock](petridish_device)
         s += 1
-
-    occupied_frame[0].save(f'../results/agents.gif',
+    end = timer() #added
+    elapsed = end - start #added
+    print(f"Time for main loop: {elapsed}") #added
+    
+    occupied_frame[0].save(f'../results/agents_gt.gif',
                            format='GIF', append_images=occupied_frame[1:], save_all=True, duration=1, loop=0)
