@@ -1,8 +1,5 @@
 import math
-import numpy as np
 import random
-from numba import int32, float32, boolean
-from numba.experimental import jitclass
 
 
 class Slime:
@@ -31,7 +28,7 @@ class Slime:
         self.live = live
 
     def update_energy(self, foodlayer):
-        if foodlayer[self.location] == 5:
+        if foodlayer[self.location[0]][self.location[1]] == 5:
             self.energy_bar = 10
         else:
             self.energy_bar -= 1
@@ -87,7 +84,7 @@ class Slime:
                         + self.sensordistance * math.cos(self.angle - self.sensorAngle)
                         + j
                     ),
-                ]
+                ] 
 
         if (F > FL) and (F > FR):
             self.angle += 0
@@ -100,7 +97,7 @@ class Slime:
 
         temp_x = int(self.location[0] + math.sin(self.angle))
         temp_y = int(self.location[1] + math.cos(self.angle))
-        if (occupied[temp_x] == 0) and (occupied[temp_y] == 0):
+        if occupied[temp_x, temp_y] == 0 :
             self.location[0] = temp_x
             self.location[1] = temp_y
         else:

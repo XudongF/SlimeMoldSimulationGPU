@@ -1,12 +1,11 @@
 # %%
 from Agent import Slime
-from numba import cuda
 import numpy as np
 from utils import get_network, create_circular_mask, getGaussianMap
 import random
 from PIL import Image
 import math
-from numba.cuda.random import create_xoroshiro128p_states, xoroshiro128p_uniform_float32
+from tqdm import tqdm
 
 
 def generate_sample(Diameter, radius):
@@ -29,7 +28,7 @@ def generate_agents(
 ):
     locations = [
         generate_sample(diameter, radius=int(diameter / 2 - boundaryControl))
-        for i in range(agent_number)
+        for _ in range(agent_number)
     ]
     locations = np.unique(locations, axis=0)
 
@@ -80,7 +79,7 @@ def generate_Food(
         random.seed(foodNumber)
         foodLocation = [
             generate_sample(diameter, radius=int(diameter / 2 - 2 * boundaryControl))
-            for i in range(foodNumber)
+            for _ in range(foodNumber)
         ]
     else:
         foodLocation = foodLocation
@@ -105,20 +104,18 @@ def one_step_simpulation(
     foodlayer,
 ):
     dead_agent = []
-    for agent in slimes:
+    for agent in tqdm(slimes):
         agent.update_location(petridish, occupied)
         agent.update_energy(foodlayer)
         agent.check_live()
-        if not agent.live():
+        if not agent.live:
             dead_agent.append(agent)
 
     return [i for i in slimes if i not in dead_agent]
 
 
 def evaporate(petridish):
-    if petridish > 20:
-        petridish = 20
-
+    petridish[petridish>20] = 20
     petridish -= 0.01
     return petridish
 
@@ -145,7 +142,7 @@ def update_petridish(slimes, petridish):
 
 if __name__ == "__main__":
     # Env setting
-    foodNumber = 9
+    foodNumber = 9  # it won't be used in the future
     boundaryControl = 100
     diffusionK = np.ones((3, 3)) / 9
     hazardLocation = np.array([900, 1100], dtype=np.float32)
@@ -155,6 +152,7 @@ if __name__ == "__main__":
     diameter, node_dict, _ = get_network(
         f"data/TNTPFiles/{location}/{location}_node.tntp", boundaryControl
     )
+    print(f"the working environment diameter is {diameter}")
 
     # Agent setting
     agent_number = int(0.01 * 0.25 * 3.15 * diameter**2)
@@ -174,6 +172,7 @@ if __name__ == "__main__":
         maxTurnAngle,
         agent_number,
     )
+
 
     mask = create_circular_mask(
         diameter, diameter, radius=int(diameter / 2 - boundaryControl)
@@ -200,10 +199,6 @@ if __name__ == "__main__":
 
     petridish = petridish + foodlayer
 
-    petridish_device = cuda.to_device(petridish)
-    occupied_device = cuda.to_device(occupied)
-    angles_device = cuda.to_device(angles)
-    locations_device = cuda.to_device(locations)
 
     threadsperblock = (32, 32)
     blockspergrid_x = math.ceil(petridish.shape[0] / threadsperblock[0])
@@ -212,24 +207,21 @@ if __name__ == "__main__":
     occupied_frame = []
 
     s = 0
-    rng_states = create_xoroshiro128p_states(1024 * 1024, seed=1)
     iterations = 10000
     while s < iterations:
-
-        set_zeros[blockspergrid, threadsperblock](occupied_device)
-        update_occupied[1024, 1024](locations_device, occupied_device)
+        print("Nothing errors! start simulation!")
+        set_zeros(occupied)
+        occupied = update_occupied(slimes, occupied)
         if s % 50 == 0:
             print(f"******This is {s} of {iterations}*******")
-            occupied = occupied_device.copy_to_host()
             occupied_frame.append(draw_occupied(occupied, foodlayer))
-
         slimes = one_step_simpulation(slimes, petridish, occupied, foodlayer)
-        petridish = update_petridish(locations, petridish)
-        evaporate[blockspergrid, threadsperblock](petridish_device)
+        petridish = update_petridish(slimes, petridish)
+        evaporate(petridish)
         s += 1
 
     occupied_frame[0].save(
-        f"results/agents.gif",
+        "results/agents.gif",
         format="GIF",
         append_images=occupied_frame[1:],
         save_all=True,
