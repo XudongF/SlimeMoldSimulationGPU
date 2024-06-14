@@ -42,6 +42,8 @@ def generate_agents(
             sensorSize=sensorSize,
             sensorAngle=sensorAngle,
             maxTurnAngle=maxTurnAngle,
+            energy_bar =100,
+            live = True,
             move=True,
         )
         for location in locations
@@ -53,6 +55,7 @@ def generate_agents(
 def generate_petridish(diameter):
     petridish = np.zeros((diameter, diameter))
     return petridish
+
 
 
 def draw_occupied(occupied, foodlayer=None):
@@ -198,19 +201,45 @@ def set_zeros(occupied):
 
 
 @cuda.jit
-def update_occupied(agent_location, occupied):
+def update_occupied(agent_location, occupied,live):
     start = cuda.grid(1)
     stride = cuda.gridsize(1)
     for location in range(start, agent_location.shape[0], stride):
-        occupied[agent_location[location][0], agent_location[location][1]] = 255
+        if live[location]:
+            occupied[agent_location[location][0], agent_location[location][1]] = 255
+        else:
+            occupied[agent_location[location][0], agent_location[location][1]] = 0
 
 
 @cuda.jit
-def update_petridish(agent_location, petridish):
+def update_energy_bar(agent_location, energy_bar, foodlayer, live):
+    start = cuda.grid(1)
+    strid = cuda.gridsize(1)
+    for location in range(start, agent_location.shape[0], strid):
+        if live[location]:
+            if foodlayer[agent_location[location][0], agent_location[location][1]] > 3:
+                energy_bar[location] = 100
+            else:
+                energy_bar[location] -=10
+
+
+
+@cuda.jit
+def update_live(agent_location, energy_bar, live):
+    start = cuda.grid(1)
+    strid = cuda.gridsize(1)
+    for location in range(start, agent_location.shape[0], strid):
+        if energy_bar[location] < 10:
+            live[location] = False
+        else:
+            live[location] = True
+@cuda.jit
+def update_petridish(agent_location, petridish, live):
     start = cuda.grid(1)
     stride = cuda.gridsize(1)
     for location in range(start, agent_location.shape[0], stride):
-        petridish[agent_location[location][0], agent_location[location][1]] += 0.5
+        if live[location]:
+            petridish[agent_location[location][0], agent_location[location][1]] += 0.5
 
 
 if __name__ == "__main__":
@@ -223,7 +252,7 @@ if __name__ == "__main__":
     withHazard = False
     location = "SiouxFalls"
     diameter, node_dict, _ = get_network(
-        f"data/TNTPFiles/{location}/{location}_node.tntp", boundaryControl
+        f"../data/TNTPFiles/{location}/{location}_node.tntp", boundaryControl
     )
 
     # Agent setting
@@ -253,6 +282,7 @@ if __name__ == "__main__":
 
     locations = np.array([slime.location for slime in slimes])
     energy_bar = np.array([slime.energy_bar for slime in slimes])
+    live = np.array([slime.live for slime in slimes])
     angles = np.array([slime.angle for slime in slimes])
 
     occupied = np.zeros((diameter, diameter), dtype=np.float32)
@@ -276,6 +306,8 @@ if __name__ == "__main__":
     angles_device = cuda.to_device(angles)
     locations_device = cuda.to_device(locations)
     energy_bar_device = cuda.to_device(energy_bar)
+    live_device = cuda.to_device(live)
+    foodlayer_device = cuda.to_device(foodlayer)
 
     threadsperblock = (32, 32)
     blockspergrid_x = math.ceil(petridish.shape[0] / threadsperblock[0])
@@ -286,10 +318,11 @@ if __name__ == "__main__":
     s = 0
     rng_states = create_xoroshiro128p_states(1024 * 1024, seed=1)
     iterations = 10000
+
     while s < iterations:
 
         set_zeros[blockspergrid, threadsperblock](occupied_device)
-        update_occupied[1024, 1024](locations_device, occupied_device)
+        update_occupied[1024, 1024](locations_device, occupied_device, live_device)
         if s % 50 == 0:
             print(f"******This is {s} of {iterations}*******")
             occupied = occupied_device.copy_to_host()
@@ -306,8 +339,11 @@ if __name__ == "__main__":
             rng_states,
         )
 
-        update_petridish[1024, 1024](locations_device, petridish_device)
+        update_petridish[1024, 1024](locations_device, petridish_device, live_device)
         evaporate[blockspergrid, threadsperblock](petridish_device)
+        update_energy_bar[1024, 1024](locations_device, energy_bar_device, foodlayer_device, live_device)
+        update_live[1024,1024](locations_device, energy_bar_device, live_device)
+        
         s += 1
 
     occupied_frame[0].save(

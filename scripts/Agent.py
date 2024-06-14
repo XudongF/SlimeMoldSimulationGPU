@@ -6,7 +6,7 @@ from numba.experimental import jitclass
 
 
 class Slime:
-    def __init__(self, location, angle, speed, sensordistance, sensorSize, sensorAngle, maxTurnAngle, move):
+    def __init__(self, location, angle, speed, energy_bar, live, sensordistance, sensorSize, sensorAngle, maxTurnAngle, move):
         self.location = location
         self.angle = angle
         self.speed = speed
@@ -15,9 +15,6 @@ class Slime:
         self.sensorSize = sensorSize
         self.sensorAngle = sensorAngle
         self.maxTurnAngle = maxTurnAngle
+        self.energy_bar = energy_bar
+        self.live = live
 
-
-if __name__ == "__main__":
-    slime = Slime(location=np.array([1, 1]), speed=1,
-                  angle=random.uniform(0, math.pi), index=0)
-    slime.update_location()
