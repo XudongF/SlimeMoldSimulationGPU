@@ -173,7 +173,6 @@ if __name__ == "__main__":
     petridish = generate_petridish(diameter=diameter)
 
     locations = np.array([slime.location for slime in slimes])
-    energy_bar = np.array([slime.energy_bar for slime in slimes])
     angles = np.array([slime.angle for slime in slimes])
 
     occupied = np.zeros((diameter, diameter), dtype=np.float32)
@@ -189,7 +188,6 @@ if __name__ == "__main__":
     occupied_device = cuda.to_device(occupied)
     angles_device = cuda.to_device(angles)
     locations_device = cuda.to_device(locations)
-    energy_bar_device = cuda.to_device(energy_bar)
 
     threadsperblock = (32, 32)
     blockspergrid_x = math.ceil(petridish.shape[0] / threadsperblock[0])
