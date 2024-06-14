@@ -42,8 +42,8 @@ def generate_agents(
             sensorSize=sensorSize,
             sensorAngle=sensorAngle,
             maxTurnAngle=maxTurnAngle,
-            energy_bar =100,
-            live = True,
+            energy_bar=200,
+            live=True,
             move=True,
         )
         for location in locations
@@ -55,7 +55,6 @@ def generate_agents(
 def generate_petridish(diameter):
     petridish = np.zeros((diameter, diameter))
     return petridish
-
 
 
 def draw_occupied(occupied, foodlayer=None):
@@ -201,7 +200,7 @@ def set_zeros(occupied):
 
 
 @cuda.jit
-def update_occupied(agent_location, occupied,live):
+def update_occupied(agent_location, occupied, live):
     start = cuda.grid(1)
     stride = cuda.gridsize(1)
     for location in range(start, agent_location.shape[0], stride):
@@ -217,11 +216,12 @@ def update_energy_bar(agent_location, energy_bar, foodlayer, live):
     strid = cuda.gridsize(1)
     for location in range(start, agent_location.shape[0], strid):
         if live[location]:
-            if foodlayer[agent_location[location][0], agent_location[location][1]] > 3:
-                energy_bar[location] = 100
-            else:
-                energy_bar[location] -=10
+            if foodlayer[agent_location[location][0], agent_location[location][1]] > 1:
+                energy_bar[location] = 200
+                # energy_bar[location] -= 0.01
 
+            else:
+                energy_bar[location] -= 0.01
 
 
 @cuda.jit
@@ -233,6 +233,8 @@ def update_live(agent_location, energy_bar, live):
             live[location] = False
         else:
             live[location] = True
+
+
 @cuda.jit
 def update_petridish(agent_location, petridish, live):
     start = cuda.grid(1)
@@ -252,7 +254,7 @@ if __name__ == "__main__":
     withHazard = False
     location = "SiouxFalls"
     diameter, node_dict, _ = get_network(
-        f"../data/TNTPFiles/{location}/{location}_node.tntp", boundaryControl
+        f"data/TNTPFiles/{location}/{location}_node.tntp", boundaryControl
     )
 
     # Agent setting
@@ -325,7 +327,11 @@ if __name__ == "__main__":
         update_occupied[1024, 1024](locations_device, occupied_device, live_device)
         if s % 50 == 0:
             print(f"******This is {s} of {iterations}*******")
+
             occupied = occupied_device.copy_to_host()
+
+            print(f"Existing agents is {int(np.nansum(occupied)/255)}")
+
             occupied_frame.append(draw_occupied(occupied, foodlayer))
 
         one_step_simpulation[1024, 1024](
@@ -341,13 +347,15 @@ if __name__ == "__main__":
 
         update_petridish[1024, 1024](locations_device, petridish_device, live_device)
         evaporate[blockspergrid, threadsperblock](petridish_device)
-        update_energy_bar[1024, 1024](locations_device, energy_bar_device, foodlayer_device, live_device)
-        update_live[1024,1024](locations_device, energy_bar_device, live_device)
-        
-        s += 1
+        update_energy_bar[1024, 1024](
+            locations_device, energy_bar_device, petridish_device, live_device
+        )
+        update_live[1024, 1024](locations_device, energy_bar_device, live_device)
 
+        s += 1
+    print(f"the total frame is {len(occupied_frame)}!!!!!!!!!")
     occupied_frame[0].save(
-        "results/agents.gif",
+        "results/agents_nofood.gif",
         format="GIF",
         append_images=occupied_frame[1:],
         save_all=True,
