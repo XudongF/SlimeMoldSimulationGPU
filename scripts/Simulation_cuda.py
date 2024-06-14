@@ -3,7 +3,7 @@
 from Agent import Slime
 from numba import cuda
 import numpy as np
-from utils import generate_sample, get_network, create_circular_mask, getGaussianMap
+from utils import get_network, create_circular_mask, getGaussianMap
 import random
 from PIL import Image
 import math
