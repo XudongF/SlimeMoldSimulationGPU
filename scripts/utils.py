@@ -11,7 +11,7 @@ import networkx as nx
 from minimumCircle import welzl, Point
 import itertools
 import os
-
+import scienceplots
 plt.style.use('science')
 
 

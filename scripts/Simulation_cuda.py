@@ -7,9 +7,7 @@ from utils import generate_sample, get_network, create_circular_mask, getGaussia
 import random
 from PIL import Image
 import math
-import random
 from numba.cuda.random import create_xoroshiro128p_states, xoroshiro128p_uniform_float32
-import time
 
 
 def generate_sample(Diameter, radius):
@@ -156,7 +154,7 @@ if __name__ == "__main__":
     withHazard = False
     location = 'SiouxFalls'
     diameter, node_dict, _ = get_network(
-        f'../data/TNTPFiles/{location}/{location}_node.tntp', boundaryControl)
+        f'data/TNTPFiles/{location}/{location}_node.tntp', boundaryControl)
 
     # Agent setting
     agent_number = int(0.01*0.25*3.15*diameter**2)
@@ -175,6 +173,7 @@ if __name__ == "__main__":
     petridish = generate_petridish(diameter=diameter)
 
     locations = np.array([slime.location for slime in slimes])
+    energy_bar = np.array([slime.energy_bar for slime in slimes])
     angles = np.array([slime.angle for slime in slimes])
 
     occupied = np.zeros((diameter, diameter), dtype=np.float32)
@@ -190,6 +189,7 @@ if __name__ == "__main__":
     occupied_device = cuda.to_device(occupied)
     angles_device = cuda.to_device(angles)
     locations_device = cuda.to_device(locations)
+    energy_bar_device = cuda.to_device(energy_bar)
 
     threadsperblock = (32, 32)
     blockspergrid_x = math.ceil(petridish.shape[0] / threadsperblock[0])
@@ -216,5 +216,5 @@ if __name__ == "__main__":
         evaporate[blockspergrid, threadsperblock](petridish_device)
         s += 1
 
-    occupied_frame[0].save(f'../results/agents.gif',
+    occupied_frame[0].save('results/agents.gif',
                            format='GIF', append_images=occupied_frame[1:], save_all=True, duration=1, loop=0)
