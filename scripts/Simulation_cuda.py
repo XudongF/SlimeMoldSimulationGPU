@@ -56,7 +56,7 @@ def generate_petridish(diameter):
     return petridish
 
 
-## some commet
+## some commet get somethign new
 
 
 def draw_occupied(occupied, foodlayer=None):
