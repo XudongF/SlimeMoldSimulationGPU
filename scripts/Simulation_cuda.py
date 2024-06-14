@@ -56,6 +56,9 @@ def generate_petridish(diameter):
     return petridish
 
 
+## some commet
+
+
 def draw_occupied(occupied, foodlayer=None):
     if foodlayer is not None:
         plot_matrix = 500 * foodlayer + occupied + 50
@@ -115,7 +118,7 @@ def one_step_simpulation(
 
 
 def evaporate(petridish):
-    petridish[petridish>20] = 20
+    petridish[petridish > 20] = 20
     petridish -= 0.01
     return petridish
 
@@ -173,7 +176,6 @@ if __name__ == "__main__":
         agent_number,
     )
 
-
     mask = create_circular_mask(
         diameter, diameter, radius=int(diameter / 2 - boundaryControl)
     )
@@ -198,7 +200,6 @@ if __name__ == "__main__":
     )
 
     petridish = petridish + foodlayer
-
 
     threadsperblock = (32, 32)
     blockspergrid_x = math.ceil(petridish.shape[0] / threadsperblock[0])
